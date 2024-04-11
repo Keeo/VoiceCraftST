@@ -91,7 +91,7 @@ def tts_to_audio(user: str, stop_repetition: int, sample_batch_size: int, reques
         transcript,
         decode_config,
         True,
-        lambda x: join_if_short(split_on_pause(x), 40) if enable_text_splitting else split_on_nothing,
+        (lambda x: join_if_short(split_on_pause(x), 80)) if enable_text_splitting else split_on_nothing,
     )
 
     return FileResponse(
@@ -125,7 +125,7 @@ async def add_speaker(name=Form(...), transcript=Form(...), file: UploadFile = F
     print(
         f"Received request to add speaker, content: {file.content_type}, file: {file.filename}, name: {name}, transcript: {transcript}"
     )
-    # audio/wav
+
     if file.size and file.size > 2e9:
         raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail=f"Max {2e9} bytes")
 

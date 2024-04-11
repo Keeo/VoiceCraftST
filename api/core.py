@@ -140,9 +140,7 @@ class Middleware:
         samples = [(voice.transcript, voice.get_sample_path())]
         waveforms = []
         for i, part in enumerate(chunker(transcript)):
-            print(
-                f"Infering audio using use_ground_truth:{use_ground_truth}, transcript_base: {samples[0][0] if use_ground_truth else samples[-1][0]}, next: {part}"
-            )
+            print(f"Generating: {part}")
 
             concated_audio, gen_audio = self._infer(
                 samples[0][1] if use_ground_truth else samples[-1][1],

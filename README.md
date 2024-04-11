@@ -57,7 +57,7 @@ Configure SillyTavern to use VoiceCraftST by following these steps:
    - Repetition Penalty: Does nothing.
    - Top K: (default: 0)
    - Top P: (default: 0.8)
-   - Stream Chunk Size: Does nothing.
+   - Stream Chunk Size: Does nothing and streaming has not been implemented.
 
 ### Optional: Enable Text Splitting
 
@@ -76,4 +76,4 @@ To add new voices to the system:
    Replace placeholders with actual data. After uploading, reload SillyTavern to access the new voice.
 
 ## System requirements
-In current state it requires 24gb GPU [VRAM requirements for training, finetuning, and inference?](https://github.com/jasonppy/VoiceCraft/issues/76) but it is likely to go down. Speed is slower compared to XTTSv2 and with TopP below 0.85 likes to generate long silences which decrease the speed further. `sample_batch_size` parameter is supposed to help with that by brute-force and generating multiple alternatives and picking shortest.
+In current state it requires 24gb GPU [VRAM requirements for training, finetuning, and inference?](https://github.com/jasonppy/VoiceCraft/issues/76) but it is likely to go down. Speed is slower compared to XTTSv2 and with TopP below 0.85 it likes to generate long silences which decrease the speed even further. `sample_batch_size` parameter is supposed to help with that by brute-force and generating multiple alternatives and picking shortest.
