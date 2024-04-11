@@ -1,111 +1,79 @@
 # VoiceCraftST
 
-VoiceCraftST is a Python-based API designed to seamlessly integrate SillyTavern with VoiceCraft. It brings XTTs like style api to be used without any modification on ST side.
-
+VoiceCraftST is a Python API that integrates the advanced text-to-speech capabilities of VoiceCraft with SillyTavern. This API enables the use of VoiceCraft's features within SillyTavern without any need for modifications on the SillyTavern platform.
 
 ## Installation
 
-The API utilizes the VoiceCraft model, due to its complex dependencies VCST supports installation via Docker only. Please note that the model requires an NVIDIA GPU, which is currently supported only on Linux systems. Windows users are advised to consult the official VoiceCraft documentation for installation instructions.
+VoiceCraftST is supported on Linux systems with NVIDIA GPUs due to specific hardware dependencies. The API installation is facilitated through Docker to manage its complex dependencies.
 
-Follow these steps to install the API on Linux:
+### Prerequisites
 
-### Step 1: Install Docker
+1. **Docker**: Install Docker by following the guide on [Docker's official website](https://docs.docker.com/get-docker/).
+2. **NVIDIA Docker**: Required for NVIDIA GPU support. Installation instructions can be found on [NVIDIA Docker's GitHub repository](https://github.com/NVIDIA/nvidia-docker).
 
-Before you can run the API, you must install Docker. Visit [Docker's official website](https://docs.docker.com/get-docker/) and follow the instructions to install Docker on your Linux distribution.
+### Installation Steps
 
-### Step 2: Install NVIDIA Docker
+1. **Clone the Repository**: Clone VoiceCraftST and initialize its submodule:
+   ```bash
+   git clone https://github.com/Keeo/VoiceCraftST.git
+   cd VoiceCraftST
+   git submodule init
+   git submodule update
+   ```
 
-To support NVIDIA GPUs, you must install NVIDIA Docker. Go to [NVIDIA Docker's GitHub repository](https://github.com/NVIDIA/nvidia-docker) and follow their installation guide for your specific Linux distribution.
+2. **Deploy Using Docker-Compose**: Navigate to the directory containing `docker-compose.yaml` and execute:
+   ```
+   docker-compose up
+   ```
+   This command builds the necessary Docker images and starts the service, making VCST available at port 5000 on your local machine.
 
-### Step 3: Clone the Repository
+## Configuration for SillyTavern
 
-Once Docker and NVIDIA Docker are installed, clone the API repository to your local machine using the following command, navigate to the cloned folder and install VoiceCraft submodule:
+Configure SillyTavern to use VoiceCraftST by following these steps:
 
-```bash
-git clone https://github.com/Keeo/VoiceCraftST.git
-cd VoiceCraftST
-git submodule init
-git submodule update
-```
+### Setup TTS Provider
 
-### Step 4: Start the API Using Docker-Compose
+1. **Choose TTS Provider**: In SillyTavern settings, select 'XTTSv2' as the TTS provider.
+2. **TTS Features**:
+   - **Enable TTS**: Ensure the 'Enabled' checkbox is checked.
+   - **Auto Generation**: Activate automatic speech generation from text.
+   - **Narration and Text Preferences**: Configure preferences for narrating user messages, handling special text formats (like quotes or code), and processing text with special characters.
 
-In the cloned directory, you will find a `docker-compose.yaml` file provided with the API. Use this file to start the API by running:
+### Advanced TTS Settings
 
-```
-docker-compose up
-```
+1. **Provider Endpoint Configuration**: Set up the XTTS endpoint with specific parameters to optimize performance:
+   ```
+   http://localhost:5000/{username}/{stop_repetition}/{sample_batch_size}
+   ```
+   Customize settings such as `username`, `stop_repetition`, and `sample_batch_size` based on your requirements.
+   - `username`: Choose any username you want, it is used as a key for rest of the configuration.
+   - `stop_repetition`: if the model generate long silence, reduce the stop_repetition to 3, 2 or even 1 (default: 3)
+   - `sample_batch_size`: if the if there are long silence or unnaturally strecthed words, increase sample_batch_size to 5 or higher. What this will do to the model is that the model will run sample_batch_size examples of the same audio, and pick the one that's the shortest. So if the speech rate of the generated is too fast change it to a smaller number. (default: 4)
 
-This command will build the necessary Docker images and start the service defined in the `docker-compose.yaml` file.
+2. **Parameter Tuning**: Adjust TTS parameters like `Temperature`, `Top P` and `Top K` to fine-tune the speech generation characteristics.
+   - Speed: Does nothing.
+   - Temperature: Sets the variance in speech generation. (default: 1.0)
+   - Length Penalty: Does nothing.
+   - Repetition Penalty: Does nothing.
+   - Top K: (default: 0)
+   - Top P: (default: 0.8)
+   - Stream Chunk Size: Does nothing.
 
-### Note:
+### Optional: Enable Text Splitting
 
-By following these installation steps, VCST is available on port 5000 on your local system. 
-
-
-## Configuration in SillyTavern
-
-This section will guide you through the process of setting up SillyTavern to connect with VoiceCraftST. Follow the steps below to configure the integration correctly.
-
-### Step 1: Select TTS Provider
-
-- Open the SillyTavern application.
-- Navigate to the TTS section in the settings.
-- From the 'Select TTS Provider' dropdown, choose 'XTTSv2' as your Text-to-Speech (TTS) provider.
-
-### Step 2: Configure TTS Settings
-
-- Make sure the 'Enabled' checkbox is checked to activate TTS functionalities.
-- Check the 'Auto Generation' box if you want SillyTavern to automatically generate speech from text.
-- Optionally, you can adjust the following settings to your preference:
-  - Narrate User Messages: If checked, SillyTavern will narrate messages made by users.
-  - Only Narrate "quotes": SillyTavern will only narrate text enclosed in quotation marks.
-  - Ignore Text in Asterisks: Text within asterisks will not be narrated.
-  - Skip Codeblocks: Ensures sections of code are not read aloud.
-  - Pass Asterisks to TTS Engine: If checked, asterisks are sent to the TTS engine as part of the text.
-
-### Step 3: Set Up XTTS Settings
-
-- Under 'XTTS Settings,' find the 'Provider Endpoint' field.
-- Enter the following URL to connect to the VoiceCraftST TTS Server: `http://localhost:5000/{username}/{stop_repetition}/{sample_batch_size}`. The url contains three parameters as they are not part of default XTTSv2 configuration.
-  - username: Choose any username you want, it is used as a key for rest of the configuration.
-  - stop_repetition: if the model generate long silence, reduce the stop_repetition to 3, 2 or even 1 (default: 3)
-  - sample_batch_size: if the if there are long silence or unnaturally strecthed words, increase sample_batch_size to 5 or higher. What this will do to the model is that the model will run sample_batch_size examples of the same audio, and pick the one that's the shortest. So if the speech rate of the generated is too fast change it to a smaller number. (default: 4)
-
-- Adjust the TTS parameters according to your needs:
-  - Speed: Does nothing.
-  - Temperature: Sets the variance in speech generation. (default: 1.0)
-  - Length Penalty: Does nothing.
-  - Repetition Penalty: Does nothing.
-  - Top K: (default: 0)
-  - Top P: (default: 0.8)
-  - Stream Chunk Size: Does nothing.
-
-### Step 4: Enable Text Splitting (Optional)
-
-- If you're dealing with large blocks of text, check 'Enable Text Splitting' to ensure smooth and continuous narration. More at [VoiceCraft#39](https://github.com/jasonppy/VoiceCraft/issues/39). (default: True) 
-
+For better handling of large text blocks, enable the 'Text Splitting' feature to ensure smooth and continuous narration. More at [VoiceCraft#39](https://github.com/jasonppy/VoiceCraft/issues/39). (default: True) 
 
 ## Adding New Voices
 
-If you wish to expand the range of voices available through the API, you can add new voice samples using the following process:
+To add new voices to the system:
 
-### Step 1: Prepare the Voice Sample
+1. **Prepare Voice Sample**: Record a mono WAV file at 16,000 Hz sample rate.
+2. **Create Transcript**: Accurately transcribe the voice sample.
+3. **Upload Command**: Use the following command to upload the new voice sample and its transcript:
+   ```bash
+   make upload SPEAKER_NAME=sample TRANSCRIPT="Your transcript here." FILE_PATH=sample.wav
+   ```
+   Replace placeholders with actual data. After uploading, reload SillyTavern to access the new voice.
 
-Record a new voice sample and save it as a mono WAV file with a sample rate of 16,000 Hz.
-
-### Step 2: Create a Transcript
-
-Write down an exact transcript of what is spoken in the voice sample. This transcript will be used for training and referencing within the system.
-
-### Step 3: Run the Upload Command
-
-Use the provided command to upload your new voice sample along with its transcript to the system:
-
-```bash
-make upload SPEAKER_NAME=sample TRANSCRIPT="Use the provided command to upload your new voice sample along with its transcript to the system." FILE_PATH=sample.wav
-```
-
-Replace `sample` with your chosen `SPEAKER_NAME`, `"Use the provided command... system.` with your actual `TRANSCRIPT` of the voice sample, and `sample.wav` with the correct `FILE_PATH` where your voice sample is saved.
-
-After running this command, the system will process the new voice and add it to the available voice options. Press `reload` in ST to see it being added.
+## System requirements
+In current state it requires 24gb GPU [VRAM requirements for training, finetuning, and inference?](https://github.com/jasonppy/VoiceCraft/issues/76) but it is likely to go down. Speed is slower compared to XTTSv2 and with TopP below 0.85 likes to generate long silences which decrease the speed further. `sample_batch_size` parameter is supposed to help with that by brute-force and generating multiple alternatives and picking shortest.
