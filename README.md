@@ -19,11 +19,13 @@ To support NVIDIA GPUs, you must install NVIDIA Docker. Go to [NVIDIA Docker's G
 
 ### Step 3: Clone the Repository
 
-Once Docker and NVIDIA Docker are installed, clone the API repository to your local machine using the following command and navigate to the cloned folder:
+Once Docker and NVIDIA Docker are installed, clone the API repository to your local machine using the following command, navigate to the cloned folder and install VoiceCraft submodule:
 
 ```bash
 git clone https://github.com/Keeo/VoiceCraftST.git
 cd VoiceCraftST
+git submodule init
+git submodule update
 ```
 
 ### Step 4: Start the API Using Docker-Compose
