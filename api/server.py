@@ -55,7 +55,7 @@ async def root():
 
 @app.get("/health")
 async def root():
-    return {"message": "Who knows? But the API is up!"}
+    return {"message": "Does it work? Who knows. But the API is up!"}
 
 
 @app.get("/speakers")
@@ -65,6 +65,7 @@ def get_speakers():
 
 
 @router.post("/tts_to_audio")
+@router.post("/tts_to_audio/")
 def tts_to_audio(user: str, stop_repetition: int, sample_batch_size: int, request: SynthesisRequest):
     enable_text_splitting = True
 

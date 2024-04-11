@@ -9,17 +9,13 @@ from .utils import file_sha256_hash, spacer, split_on_pause, string_to_sha256
 import torch
 import torchaudio
 import json
-import sys
-
-sys.path.append("../VoiceCraft")
-
-from data.tokenizer import (
+from VoiceCraft.models.voicecraft import VoiceCraft
+from VoiceCraft.data.tokenizer import (
     AudioTokenizer,
     TextTokenizer,
     tokenize_audio,
     tokenize_text,
 )
-from models.voicecraft import VoiceCraft
 
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -97,7 +93,7 @@ class DecodeConfig:
     sample_batch_size: int = 4
 
 
-def download(voicecraft_name="giga830M.pth"):
+def download(voicecraft_name="giga830M.pth", encodec_name="encodec_4cb2048_giga.th"):
     # or giga330M.pth
     voicecraft_path = os.path.join(CHECKPOINT_DIR, voicecraft_name)
     if not os.path.exists(voicecraft_path):
@@ -106,12 +102,12 @@ def download(voicecraft_name="giga830M.pth"):
         )
         os.system(f"mv /tmp/{voicecraft_name} {voicecraft_path}")
 
-    encodec_path = "./pretrained_models/encodec_4cb2048_giga.th"
+    encodec_path = os.path.join(CHECKPOINT_DIR, encodec_name)
     if not os.path.exists(encodec_path):
         os.system(
-            f"wget https://huggingface.co/pyp1/VoiceCraft/resolve/main/encodec_4cb2048_giga.th -O /tmp/encodec_4cb2048_giga.th"
+            f"wget https://huggingface.co/pyp1/VoiceCraft/resolve/main/{encodec_name} -O /tmp/{encodec_name}"
         )
-        os.system(f"mv encodec_4cb2048_giga.th {encodec_path}")
+        os.system(f"mv /tmp/{encodec_name} {encodec_path}")
     return voicecraft_path, encodec_path
 
 
