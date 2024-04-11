@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  voicecraft:
+    image: voicecraft
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    container_name: voicecraft
+    ports:
+      - "5000:5000"
+    command: ["conda", "run", "--no-capture-output", "-n", "voicecraft", "python", "-m", "uvicorn", "api.server:app", "--reload", "--port", "5000", "--host", "0.0.0.0"]
+    
+    volumes:
+      - "./data/users:/users"
+      - "./data/checkpoints:/checkpoints"
+      - "./data/samples:/samples"
+      - ./api:/api
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: [gpu]

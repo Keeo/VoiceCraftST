@@ -1,0 +1,5 @@
+uvicorn
+fastapi
+pydantic
+python-multipart
+loguru
