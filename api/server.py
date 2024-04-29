@@ -1,23 +1,26 @@
-from dataclasses import asdict
-import logging
 import tempfile
-from uu import decode
-
 from .utils import split_on_pause, split_on_nothing, join_if_short
-from .config import user_setting_path
-from .core import DecodeConfig, Middleware, Voice, download
+from .config import user_setting_path, MODEL, STRATEGY, CUT_LENGTH, CUT_FLEX
+from .core import (
+    DecodeConfig,
+    Middleware,
+    Voice,
+    download_encodec,
+    GroundTruthStrategy,
+    SlidingWindowStrategy,
+    LastGenerationStrategy,
+)
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException, status, APIRouter
 import json
 from fastapi.middleware.cors import CORSMiddleware
 import os
 from pydantic import BaseModel
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse
 import wave
 
 
-voicecraft_path, encodec_path = download()
 m = Middleware()
-m.load(voicecraft_path, encodec_path)
+m.load(MODEL, download_encodec())
 
 app = FastAPI()
 app.add_middleware(
@@ -85,13 +88,18 @@ def tts_to_audio(user: str, stop_repetition: int, sample_batch_size: int, reques
     decode_config.sample_batch_size = sample_batch_size
 
     transcript = request.text.replace("*", "").replace('"', "")
+    strategy_class = globals().get(STRATEGY)
+    if not strategy_class:
+        raise ValueError(f"No such class: {STRATEGY}")
 
     output_file_path = m.generate(
         Voice.get_voices()[request.speaker_wav],
         transcript,
         decode_config,
-        True,
-        (lambda x: join_if_short(split_on_pause(x), 80)) if enable_text_splitting else split_on_nothing,
+        strategy_class(),
+        (lambda x: join_if_short(split_on_pause(x), CUT_LENGTH, CUT_FLEX))
+        if enable_text_splitting
+        else split_on_nothing,
     )
 
     return FileResponse(

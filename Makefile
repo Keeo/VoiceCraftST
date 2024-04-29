@@ -11,3 +11,7 @@ upload:
 	-F 'name=$(SPEAKER_NAME)' \
 	-F 'transcript="$(TRANSCRIPT)"' \
 	-F 'file=@$(FILE_PATH)'
+
+
+lint:
+    black api

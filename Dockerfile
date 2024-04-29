@@ -20,7 +20,7 @@ RUN wget \
 
 RUN conda --version
 
-COPY environment.yml environment.yml
+COPY VoiceCraft/environment.yml environment.yml
 COPY api/requirements.txt requirements.txt
 
 RUN conda env create -f environment.yml

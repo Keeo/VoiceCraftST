@@ -31,10 +31,14 @@ def split_on_pause(text: str) -> Generator[str, None, None]:
         yield chunk[0].upper() + chunk[1:]
 
 
-def join_if_short(iterator: Generator[str, None, None], cut_length: int = 100) -> Generator[str, None, None]:
+def join_if_short(iterator: Generator[str, None, None], cut_length: int, cut_flex: float) -> Generator[str, None, None]:
     buffer = ""
 
     for text in iterator:
+        if (len(text) > cut_length * cut_flex) and buffer:
+            yield buffer
+            buffer = ""
+
         buffer += text + " "
 
         if len(buffer) >= cut_length:
