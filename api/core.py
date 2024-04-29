@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass, field
 import logging
 from pathlib import Path
@@ -13,7 +14,6 @@ from VoiceCraft.models.voicecraft import VoiceCraft
 from VoiceCraft.data.tokenizer import (
     AudioTokenizer,
     TextTokenizer,
-    tokenize_audio,
     tokenize_text,
 )
 
@@ -29,7 +29,7 @@ class Voice:
     transcript: str
 
     @staticmethod
-    def from_sample(name: str, audio_path: str, transcript: str) -> 'Voice':
+    def from_sample(name: str, audio_path: str, transcript: str) -> "Voice":
         dst = os.path.join(VOICE_DIR, file_sha256_hash(audio_path))
         os.makedirs(dst, exist_ok=True)
 
@@ -37,7 +37,7 @@ class Voice:
 
         with open(os.path.join(dst, "source.txt"), "w") as f:
             f.write(transcript)
-        
+
         voice = Voice(
             id=file_sha256_hash(audio_path),
             name=name,
@@ -45,7 +45,7 @@ class Voice:
             transcript=transcript,
         )
 
-        with open(os.path.join(dst, 'config.json'), 'w', encoding='utf-8') as f:
+        with open(os.path.join(dst, "config.json"), "w", encoding="utf-8") as f:
             json.dump(asdict(voice), f, indent=4)
 
         return voice
@@ -63,9 +63,9 @@ class Voice:
     @staticmethod
     def voice_config_paths():
         return Path(VOICE_DIR).glob("*/config.json")
-    
+
     @staticmethod
-    def get_voices() -> dict[str, 'Voice']:
+    def get_voices() -> dict[str, "Voice"]:
         voices = {}
         for config in Voice.voice_config_paths():
             with open(config) as f:
@@ -77,6 +77,7 @@ class Voice:
                     transcript=data["transcript"],
                 )
         return voices
+
 
 @dataclass
 class DecodeConfig:
@@ -93,32 +94,95 @@ class DecodeConfig:
     sample_batch_size: int = 4
 
 
-def download(voicecraft_name="giga830M.pth", encodec_name="encodec_4cb2048_giga.th"):
-    # or giga330M.pth
-    voicecraft_path = os.path.join(CHECKPOINT_DIR, voicecraft_name)
-    if not os.path.exists(voicecraft_path):
-        os.system(
-            f"wget https://huggingface.co/pyp1/VoiceCraft/resolve/main/{voicecraft_name}\?download\=true -O /tmp/{voicecraft_name}"
-        )
-        os.system(f"mv /tmp/{voicecraft_name} {voicecraft_path}")
-
+def download_encodec(encodec_name="encodec_4cb2048_giga.th"):
     encodec_path = os.path.join(CHECKPOINT_DIR, encodec_name)
     if not os.path.exists(encodec_path):
-        os.system(
-            f"wget https://huggingface.co/pyp1/VoiceCraft/resolve/main/{encodec_name} -O /tmp/{encodec_name}"
-        )
+        os.system(f"wget https://huggingface.co/pyp1/VoiceCraft/resolve/main/{encodec_name} -O /tmp/{encodec_name}")
         os.system(f"mv /tmp/{encodec_name} {encodec_path}")
-    return voicecraft_path, encodec_path
+    return encodec_path
+
+
+@dataclass
+class InferenceStorage:
+    _strategy: "Strategy"
+    _voice: Voice
+    _history: list[tuple[str, torch.Tensor]] = field(default_factory=list)
+
+    def __post_init__(self):
+        self._history.append(
+            (
+                self._voice.transcript,
+                torchaudio.load(self._voice.get_sample_path())[0].cuda(),
+            )
+        )
+
+    def update(self, transcript: str, gen_frames: torch.Tensor):
+        self._history.append((transcript, gen_frames))
+
+    def next_transcript(self, transcript):
+        return self._strategy.next_transcript(self._history, transcript)
+
+    def next_tokenized_sample(self):
+        return self._strategy.next_tokenized_sample(self._history)
+
+
+class Strategy(ABC):
+    @abstractmethod
+    def next_transcript(self, history, transcript):
+        pass
+
+    @abstractmethod
+    def next_tokenized_sample(self, history):
+        pass
+
+
+class GroundTruthStrategy(Strategy):
+    def next_transcript(self, history, transcript):
+        return history[0][0] + " " + transcript
+
+    def next_tokenized_sample(self, history):
+        return history[0][1]
+
+
+class SlidingWindowStrategy(Strategy):
+    def next_transcript(self, history, transcript):
+        t = history[0][0]
+
+        if len(history) > 1:
+            t += " " + history[-1][0]
+
+        return t + " " + transcript
+
+    def next_tokenized_sample(self, history):
+        if len(history) == 1:
+            return history[0][1]
+
+        return torch.cat(
+            spacer(
+                [
+                    history[0][1],
+                    history[-1][1],
+                ],
+                torch.zeros((1, int(16e3 * 0.2))).cuda(),
+            ),
+            dim=1,
+        )
+
+
+class LastGenerationStrategy(Strategy):
+    def next_transcript(self, history, transcript):
+        return history[-1][0] + " " + transcript
+
+    def next_tokenized_sample(self, history):
+        return history[-1][1]
 
 
 class Middleware:
-    def load(self, voicecraft_path, encodec_path):
-        self.ckpt = torch.load(voicecraft_path, map_location="cpu")
-        self.model = VoiceCraft(self.ckpt["config"])
-        self.model.load_state_dict(self.ckpt["model"])
+    def load(self, model_path, encodec_path):
+        self.model = VoiceCraft.from_pretrained(model_path)
+        self.phn2num = self.model.args.phn2num
+        self.config = vars(self.model.args)
         self.model.to(device)
-        self.model.eval()
-        self.phn2num = self.ckpt["phn2num"]
 
         self.text_tokenizer = TextTokenizer(backend="espeak")
         self.audio_tokenizer = AudioTokenizer(signature=encodec_path, device=device)
@@ -128,41 +192,42 @@ class Middleware:
         voice: Voice,
         transcript: str,
         decode_config: DecodeConfig,
-        use_ground_truth: bool,
-        chunker = split_on_pause,
+        strategy: Strategy,
+        chunker=split_on_pause,
     ) -> str:
         dst = os.path.join(voice.directory, string_to_sha256(transcript))
         os.makedirs(dst, exist_ok=True)
 
         with open(os.path.join(dst, "config.json"), "w") as f:
             json.dump({"transcript": transcript}, f)
-        
-        samples = [(voice.transcript, voice.get_sample_path())]
+
+        storage = InferenceStorage(
+            strategy,
+            voice,
+        )
+
         waveforms = []
         for i, part in enumerate(chunker(transcript)):
             print(f"Generating: {part}")
-
-            concated_audio, gen_audio = self._infer(
-                samples[0][1] if use_ground_truth else samples[-1][1],
-                (samples[0][0] if use_ground_truth else samples[-1][0]) + " " + part,
+            _, gen_frames = self._infer(
+                storage.next_transcript(part),
+                storage.next_tokenized_sample(),
                 decode_config,
             )
-            gen_audio = gen_audio[0].cpu()
+            gen_sample = self.audio_tokenizer.decode([(gen_frames, None)])
+            gen_audio = gen_sample[0].cpu()
             waveforms.append(gen_audio)
-            torchaudio.save(os.path.join(dst, f"gen_audio_{i}.wav"), gen_audio, decode_config.codec_audio_sr)
-            samples.append((part, os.path.join(dst, f"gen_audio_{i}.wav")))
+            storage.update(part, gen_sample[0])
 
         joined_waveform = torch.cat(spacer(waveforms, torch.zeros((1, int(16e3 * 0.2)))), dim=1)
         torchaudio.save(os.path.join(dst, "gen_audio.wav"), joined_waveform, decode_config.codec_audio_sr)
 
-        for sample in samples[1:]:
-            os.remove(sample[1])
-
         return os.path.join(dst, "gen_audio.wav")
 
-
     @torch.no_grad()
-    def _infer(self, audio_fn, target_text, decode_config: DecodeConfig, num_frames=-1):
+    def _infer(
+        self, target_text, wav, decode_config: DecodeConfig
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         text_tokens = [
             self.phn2num[phn]
             for phn in tokenize_text(self.text_tokenizer, text=target_text.strip())
@@ -171,12 +236,15 @@ class Middleware:
         text_tokens = torch.LongTensor(text_tokens).unsqueeze(0)
         text_tokens_lens = torch.LongTensor([text_tokens.shape[-1]])
 
-        encoded_frames = tokenize_audio(self.audio_tokenizer, audio_fn, offset=0, num_frames=num_frames)
+        wav = wav.unsqueeze(0)
+        with torch.no_grad():
+            encoded_frames = self.audio_tokenizer.encode(wav)
+
         original_audio = encoded_frames[0][0].transpose(2, 1)  # [1,T,K]
         assert (
             original_audio.ndim == 3
             and original_audio.shape[0] == 1
-            and original_audio.shape[2] == self.ckpt["config"].n_codebooks
+            and original_audio.shape[2] == self.config["n_codebooks"]
         ), original_audio.shape
         logging.info(
             f"original audio length: {original_audio.shape[1]} codec frames, which is {original_audio.shape[1]/decode_config.codec_sr:.2f} sec."
@@ -186,7 +254,7 @@ class Middleware:
         concat_frames, gen_frames = self.model.inference_tts_batch(
             text_tokens.to(device),
             text_tokens_lens.to(device),
-            original_audio[..., : self.ckpt["config"].n_codebooks].to(device),  # [1,T,8]
+            original_audio[..., : self.config["n_codebooks"]].to(device),  # [1,T,8]
             top_k=decode_config.top_k,
             top_p=decode_config.top_p,
             temperature=decode_config.temperature,
@@ -204,7 +272,4 @@ class Middleware:
             f"generated encoded_frames.shape: {gen_frames.shape}, which is {gen_frames.shape[-1]/decode_config.codec_sr} sec."
         )
 
-        concat_sample = self.audio_tokenizer.decode([(concat_frames, None)])
-        gen_sample = self.audio_tokenizer.decode([(gen_frames, None)])
-
-        return concat_sample, gen_sample
+        return concat_frames, gen_frames

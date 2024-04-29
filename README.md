@@ -2,9 +2,13 @@
 
 VoiceCraftST is a Python API that integrates the advanced text-to-speech capabilities of VoiceCraft with SillyTavern. This API enables the use of VoiceCraft's features within SillyTavern without any need for modifications on the SillyTavern platform.
 
+## Updates
+
+* **2024.4.27** Implemented sliding window and bumped to latest version of VC
+
 ## Installation
 
-VoiceCraftST is supported on Linux systems with NVIDIA GPUs due to specific hardware dependencies. The API installation is facilitated through Docker to manage its complex dependencies.
+VoiceCraftST is supported on Linux systems with NVIDIA GPUs to avoid complex dependencies required for VoiceCraft model.
 
 ### Prerequisites
 

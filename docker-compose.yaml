@@ -10,7 +10,9 @@ services:
     ports:
       - "5000:5000"
     command: ["conda", "run", "--no-capture-output", "-n", "voicecraft", "python", "-m", "uvicorn", "api.server:app", "--reload", "--port", "5000", "--host", "0.0.0.0"]
-    
+    environment:
+      - HF_HOME=/checkpoints
+      - STRATEGY=SlidingWindowStrategy # GroundTruthStrategy, SlidingWindowStrategy or LastGenerationStrategy
     volumes:
       - "./data/users:/users"
       - "./data/checkpoints:/checkpoints"
